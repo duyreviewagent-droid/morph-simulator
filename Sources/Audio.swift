@@ -10,8 +10,10 @@ final class AudioSystem {
     private var players: [AVAudioPlayerNode] = []
     private var speeds: [AVAudioUnitVarispeed] = []
     private var nextPlayer = 0
-    private var buffers: [String: AVAudioPCMBuffer] = [:]
-    private var variants: [String: Int] = [:]
+    private(set) var buffers: [String: AVAudioPCMBuffer] = [:]
+    private(set) var variants: [String: Int] = [:]
+    /// Trailer recording: every requested one-shot is reported here (even when muted).
+    var onPlay: ((String, Float, Float, Float) -> Void)?
     private let queue = DispatchQueue(label: "morph.sfx")
     private(set) var running = false
     var muted = false
@@ -64,6 +66,7 @@ final class AudioSystem {
     /// Plays a one-shot. Names with variants ("moo") pick one at random.
     @discardableResult
     func play(_ name: String, volume: Float = 1, pan: Float = 0, jitter: Float = 0.05, rate: Float = 1) -> Int {
+        onPlay?(name, volume, pan, rate)
         guard running, !muted else { return -1 }
         var key = name
         if let n = variants[name] { key = "\(name)_\(Int.random(in: 0..<n))" }
@@ -84,6 +87,10 @@ final class AudioSystem {
     }
 
     var bufferNames: [String] { buffers.keys.sorted() }
+    func buffer(_ name: String) -> AVAudioPCMBuffer? {
+        if let n = variants[name] { return buffers["\(name)_\(Int.random(in: 0..<n))"] }
+        return buffers[name]
+    }
 
     func selfCheck() -> Bool {
         var bad: [String] = []
@@ -274,12 +281,13 @@ final class AudioSystem {
         buffers["splash"] = {
             var n = Noise32(s: 140); var bp = Reso(), lp = LP1(); var rr = RNG(141)
             let drops = (0..<30).map { _ in (rr.range(0.1, 1.2), rr.range(1500, 4500)) }
-            var dr = Reso()
+            // each droplet gets its own filter (a shared one blows up when droplets overlap)
+            var dr = [Reso](repeating: Reso(), count: 30)
             return make(1.4, norm: 0.8) { t in
                 let x = n.next()
                 var s = lp.run(x, f: 800, sr: fsr) * expf(-t * 4) * 3 + bp.run(x, f: 1400, q: 0.8, sr: fsr) * expf(-t * 5)
                 s += sinf(tau * (40 + 60 * expf(-t * 10)) * t) * expf(-t * 6) * 0.7
-                for (t0, f) in drops where t > t0 && t < t0 + 0.04 { s += dr.run(x, f: f * (1 + (t - t0) * 20), q: 15, sr: fsr) * expf(-(t - t0) * 90) * 0.8 }
+                for (k, (t0, f)) in drops.enumerated() where t > t0 && t < t0 + 0.04 { s += dr[k].run(x, f: f * (1 + (t - t0) * 20), q: 15, sr: fsr) * expf(-(t - t0) * 90) * 0.8 }
                 return (s, s * 0.95)
             }
         }()

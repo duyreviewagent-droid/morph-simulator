@@ -225,6 +225,7 @@ extension World {
             } else {
                 n.physicsBody = SCNPhysicsBody(type: .static, shape: SCNPhysicsShape(geometry: SCNBox(width: CGFloat(s.maxX - s.minX), height: CGFloat(h), length: CGFloat(s.maxZ - s.minZ), chamferRadius: 0), options: nil))
                 n.simdPosition = V3((s.minX + s.maxX) / 2, base + h / 2, (s.minZ + s.maxZ) / 2)
+                n.simdEulerAngles = V3(0, s.yaw, 0)
             }
             n.physicsBody?.categoryBitMask = 1
             n.physicsBody?.collisionBitMask = -1

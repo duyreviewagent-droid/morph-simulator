@@ -202,6 +202,7 @@ final class GenLegs: LegsPart {
         tail?.simdPosition = V3(0, by + R * 0.45, -L - 0.02 * s)
         attach = V3(0, by + R * 0.6, L * 0.8)
         radius = clampf(L * 0.72, 0.3, 1.05)
+        trunkHalf = L + 0.05 * s; trunkWidth = R * 1.05; trunkZ = 0
         stride = legH * 2.2 + 0.3 * s
         footPhases = [0, 0.25, 0.5, 0.75]
     }
@@ -247,6 +248,7 @@ final class GenLegs: LegsPart {
         tail = buildTail(tailPiv, d, s, m, ground: by)
         attach = V3(0, by + R * 0.55, L * 0.8)
         radius = clampf(L * 0.8, 0.3, 1.0)
+        trunkHalf = L + 0.05 * s; trunkWidth = R * 1.1 + 0.05 * s; trunkZ = 0
         stride = 0.6 * s + legH
         footPhases = [0, 0.5]
     }
@@ -354,6 +356,7 @@ final class GenLegs: LegsPart {
         }
         attach = V3(0, liftY + r, 0.12 * s)
         radius = 0.3
+        trunkHalf = 0.8 * s * d.bodyLen; trunkWidth = max(0.12, r * 1.6); trunkZ = 0.12 * s - trunkHalf
         stride = 0.5 * s
         mass = max(0.2, s * s * 1.2)
         R = r
@@ -374,6 +377,7 @@ final class GenLegs: LegsPart {
         }
         attach = V3(0, R * 1.8, 0.12 * s)
         radius = max(0.3, R * 1.3)
+        trunkHalf = (0.5 + 0.5 * d.bodyLen) * s * 0.5; trunkWidth = R * 1.05; trunkZ = 0.2 * s - trunkHalf
         stride = 0.7 * s
     }
 
@@ -405,6 +409,7 @@ final class GenLegs: LegsPart {
         }
         attach = V3(0, h + 0.08 * s, 0.06 * s)
         radius = max(0.25, 0.25 * s * (spider ? 1.6 : 1))
+        trunkHalf = (spider ? 0.25 : 0.32) * s * d.bodyLen; trunkWidth = max(0.15, (crab ? 0.3 : 0.14) * s); trunkZ = 0.06 * s - trunkHalf * 0.8
         stride = 0.35 * s
         footPhases = [0, 0.5]
         mass = max(0.1, s * s * 0.5)

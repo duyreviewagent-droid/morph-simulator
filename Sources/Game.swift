@@ -149,6 +149,7 @@ final class Game: NSObject, SCNSceneRendererDelegate, NPCHost {
     var stampedeT: Float = 0
     var hoverSnd: Float = 0
     var pounceT: Float = 0
+    var hitCache: [(z: Float, r: Float)] = []
     var flightMode = 0
     var rocketReady = true
     var boostT: Float = 0

@@ -4,17 +4,21 @@ import simd
 extension Game {
     /// Keeps the player's invisible physics capsule in step so it shoves junk around.
     func updatePusher() {
-        let r = body.radius, h = max(0.4, body.height)
-        let want = V3(r, h, 0)
-        if simd_length(want - pusherShape) > 0.05 {
+        let h = max(0.4, body.height)
+        let circles = hitCache.isEmpty ? body.hitCircles() : hitCache
+        let want = V3(circles.reduce(0) { $0 + $1.r * 3 + $1.z }, h, Float(circles.count))
+        if simd_length(want - pusherShape) > 0.02 {
             pusherShape = want
-            let cap = SCNCapsule(capRadius: CGFloat(r * 0.9), height: CGFloat(max(h, r * 2)))
-            let b = SCNPhysicsBody(type: .kinematic, shape: SCNPhysicsShape(geometry: cap, options: nil))
+            // one upright capsule per collision circle, laid out along the body
+            let shapes = circles.map { SCNPhysicsShape(geometry: SCNCapsule(capRadius: CGFloat($0.r * 0.92), height: CGFloat(max(h, $0.r * 2))), options: nil) }
+            let xf = circles.map { NSValue(scnMatrix4: SCNMatrix4MakeTranslation(0, 0, CGFloat($0.z))) }
+            let b = SCNPhysicsBody(type: .kinematic, shape: SCNPhysicsShape(shapes: shapes, transforms: xf))
             b.categoryBitMask = 4
             b.collisionBitMask = 8
             pusher.physicsBody = b
         }
         pusher.simdPosition = pos + V3(0, h / 2, 0)
+        pusher.simdEulerAngles = V3(0, yaw, 0)
     }
 
     /// Pushes junk in a cone (or all around when dir is nil).
@@ -47,11 +51,12 @@ extension Game {
         // barge into things
         for k in world.knockables where !k.exploded {
             let p = k.pos
-            let d = SIMD2(p.x - pos.x, p.z - pos.z)
+            let (cc, cr) = nearestCircle(to: p)
+            let d = SIMD2(p.x - cc.x, p.z - cc.z)
             let l = simd_length(d)
             let key = ObjectIdentifier(k)
             if let c = knockCool[key], c > 0 { knockCool[key] = c - dt; continue }
-            guard l < body.radius + 0.55, p.y < pos.y + body.height + 0.3, p.y > pos.y - 0.8, hs > 1.2, let pb = k.node.physicsBody else { continue }
+            guard l < cr + 0.55, p.y < pos.y + body.height + 0.3, p.y > pos.y - 0.8, hs > 1.2, let pb = k.node.physicsBody else { continue }
             let n = simd_normalize(V3(d.x, 0, d.y) + V3(vel.x, 0, vel.z) * 0.1)
             let imp = (n * hs * 0.9 + V3(0, hs * 0.35, 0)) * heavy * Float(pb.mass) * 0.6
             pb.applyForce(SCNVector3(imp), at: SCNVector3(0, 0.3, 0), asImpulse: true)

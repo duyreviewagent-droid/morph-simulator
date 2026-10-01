@@ -12,6 +12,7 @@ struct Solid {
     var tag = ""
     var surface: Surface = .wood
     var walkable = true
+    var yaw: Float = 0          // rotated boxes (footprint is the unrotated size, centred)
 
     static func box(_ cx: Float, _ cz: Float, _ w: Float, _ l: Float, _ h: Float, base: Float = 0, tag: String = "", surface: Surface = .wood) -> Solid {
         Solid(minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - l / 2, maxZ: cz + l / 2, bottom: base, top: { _, _ in base + h }, tag: tag, surface: surface)
@@ -27,6 +28,16 @@ struct Solid {
             return (l - r.r, l > 1e-5 ? d / l : SIMD2(1, 0))
         }
         let cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2
+        if yaw != 0 {
+            // work in the box's own frame, then rotate the push direction back
+            let c = cosf(yaw), sn = sinf(yaw)
+            let dx = x - cx, dz = z - cz
+            var me = self; me.yaw = 0
+            let hx = (maxX - minX) / 2, hz = (maxZ - minZ) / 2
+            me.minX = -hx; me.maxX = hx; me.minZ = -hz; me.maxZ = hz
+            let (d, n) = me.edge(dx * c - dz * sn, dx * sn + dz * c)
+            return (d, SIMD2(n.x * c + n.y * sn, -n.x * sn + n.y * c))
+        }
         let hx = (maxX - minX) / 2, hz = (maxZ - minZ) / 2
         let qx = abs(x - cx) - hx, qz = abs(z - cz) - hz
         if qx > 0 || qz > 0 {
@@ -215,7 +226,8 @@ final class World {
         var tag = ""
         if waterLevel(x, z) != nil { surf = .water }
         for s in solids where s.walkable {
-            guard x > s.minX - r && x < s.maxX + r && z > s.minZ - r && z < s.maxZ + r else { continue }
+            let m = s.yaw != 0 ? max(s.maxX - s.minX, s.maxZ - s.minZ) * 0.5 : 0
+            guard x > s.minX - r - m && x < s.maxX + r + m && z > s.minZ - r - m && z < s.maxZ + r + m else { continue }
             let (d, _) = s.edge(x, z)
             guard d < r * 0.4 else { continue }
             let t = s.top(clampf(x, s.minX, s.maxX), clampf(z, s.minZ, s.maxZ))
@@ -228,7 +240,8 @@ final class World {
     func collide(_ p: inout V3, r: Float, h: Float, step: Float = 0.5) -> Bool {
         var hit = false
         for s in solids {
-            guard p.x > s.minX - r && p.x < s.maxX + r && p.z > s.minZ - r && p.z < s.maxZ + r else { continue }
+            let m = s.yaw != 0 ? max(s.maxX - s.minX, s.maxZ - s.minZ) * 0.5 : 0
+            guard p.x > s.minX - r - m && p.x < s.maxX + r + m && p.z > s.minZ - r - m && p.z < s.maxZ + r + m else { continue }
             let (d, n) = s.edge(p.x, p.z)
             guard d < r else { continue }
             let t = s.top(clampf(p.x, s.minX, s.maxX), clampf(p.z, s.minZ, s.maxZ))
@@ -451,8 +464,9 @@ final class World {
         // foundation
         n.add(World.meterBox(b.len + 0.3, 0.5, b.wid + 0.3, Mat.concrete).at(0, 0.1, 0))
         let e = b.eave, rg = b.ridge
-        solids.append(Solid(minX: b.x - hl - 0.5, maxX: b.x + hl + 0.5, minZ: b.z - hw - 0.7, maxZ: b.z + hw + 0.7, bottom: -1,
-                            top: { _, z in e - 0.3 + (rg - e + 0.2) * max(0, 1 - abs(z - b.z) / (hw + 0.7)) }, tag: "barnRoof", surface: .metal))
+        let roofTop: (Float, Float) -> Float = { _, z in e - 0.3 + (rg - e + 0.2) * max(0, 1 - abs(z - b.z) / (hw + 0.7)) }
+        solids.append(Solid(minX: b.x - hl - 0.12, maxX: b.x + hl + 0.12, minZ: b.z - hw - 0.12, maxZ: b.z + hw + 0.12, bottom: -1, top: roofTop, tag: "barnRoof", surface: .metal))
+        solids.append(Solid(minX: b.x - hl - 0.5, maxX: b.x + hl + 0.5, minZ: b.z - hw - 0.7, maxZ: b.z + hw + 0.7, bottom: e - 0.5, top: roofTop, tag: "barnRoof", surface: .metal))
     }
 
     private func buildSilo() {
@@ -704,8 +718,9 @@ final class World {
         chair.add(boxNode(0.5, 0.7, 0.05, Mat.woodFresh).at(0, 0.8, -0.24))
         for s in [Float(1), -1] { chair.add(boxNode(0.04, 0.05, 0.8, Mat.woodFresh).at(s * 0.23, 0.02, 0)) }
         let e = h.eave + 0.4, rg = h.ridge + 0.4
-        solids.append(Solid(minX: h.x - hw - 0.5, maxX: h.x + hw + 0.5, minZ: h.z - hd - 0.6, maxZ: h.z + hd + 0.6, bottom: -1,
-                            top: { _, z in e - 0.3 + (rg - e) * max(0, 1 - abs(z - h.z) / (hd + 0.6)) }, tag: "houseRoof", surface: .wood))
+        let houseTop: (Float, Float) -> Float = { _, z in e - 0.3 + (rg - e) * max(0, 1 - abs(z - h.z) / (hd + 0.6)) }
+        solids.append(Solid(minX: h.x - hw - 0.08, maxX: h.x + hw + 0.08, minZ: h.z - hd - 0.08, maxZ: h.z + hd + 0.08, bottom: -1, top: houseTop, tag: "houseRoof", surface: .wood))
+        solids.append(Solid(minX: h.x - hw - 0.5, maxX: h.x + hw + 0.5, minZ: h.z - hd - 0.6, maxZ: h.z + hd + 0.6, bottom: e - 0.4, top: houseTop, tag: "houseRoof", surface: .wood))
         solids.append(.box(h.x, h.z - hd - pd / 2, h.w - 1, pd, 0.6, tag: "porch", surface: .wood))
         solids.append(.box(h.x, h.z - hd - pd - 0.6, 1.6, 0.6, 0.3, tag: "steps", surface: .wood))
     }
@@ -792,7 +807,11 @@ final class World {
             wheel(s * 0.95, 0.8, -0.7, 0.8, 0.45)
             wheel(s * 0.62, 0.45, 1.3, 0.45, 0.25)
         }
-        solids.append(Solid(minX: t.x - 1.4, maxX: t.x + 1.4, minZ: t.z - 1.6, maxZ: t.z + 1.9, bottom: -1, top: { _, _ in Farm.height(t.x, t.z) + 1.6 }, tag: "tractor", surface: .metal))
+        // the tractor is turned 0.5 rad: a rotated box hugging the body and the big wheels
+        let tc = SIMD2(t.x, t.z) + SIMD2(sinf(0.5), cosf(0.5)) * 0.3
+        var ts = Solid(minX: tc.x - 1.25, maxX: tc.x + 1.25, minZ: tc.y - 1.75, maxZ: tc.y + 1.75, bottom: -1, top: { _, _ in Farm.height(t.x, t.z) + 1.6 }, tag: "tractor", surface: .metal)
+        ts.yaw = 0.5
+        solids.append(ts)
     }
 
     private func buildTrees() {

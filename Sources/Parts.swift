@@ -89,6 +89,10 @@ struct Outfit {
 
 class LegsPart: Part {
     var footNodes: [SCNNode] = []
+    /// Trunk for collisions: half-length along z, half-width, and where its centre sits on z.
+    var trunkHalf: Float = 0
+    var trunkWidth: Float = 0.3
+    var trunkZ: Float = 0
     var attach = V3(0, 1, 0)
     var radius: Float = 0.3
     var stride: Float = 1.2          // metres per gait cycle
@@ -220,6 +224,7 @@ final class CowLegs: LegsPart {
     init() {
         super.init(.cow)
         attach = V3(0, 1.2, 0.6); radius = 0.62; stride = 1.7; mass = 3
+        trunkHalf = 0.8; trunkWidth = 0.42; trunkZ = 0
         footPhases = [0, 0.25, 0.5, 0.75]
         node.add(barrel)
         let rings = [Ring(V3(0, 1.13, -0.8), 0.06, 0.06), Ring(V3(0, 1.12, -0.74), 0.25, 0.25), Ring(V3(0, 1.1, -0.58), 0.34, 0.32, e: 2.2), Ring(V3(0, 1.05, -0.25), 0.37, 0.37),
@@ -795,6 +800,34 @@ final class Body {
 
     var height: Float { legs.attach.y + (torso.neckRot > 0.5 ? 0.2 : torso.neck.y) + head.height + lift }
     var radius: Float { legs.radius }
+
+    /// Collision circles in body space: (z along the body, radius). Long animals get a chain of
+    /// circles down the trunk plus one for a head that sticks out in front; upright bodies get one.
+    func hitCircles() -> [(z: Float, r: Float)] {
+        let w = max(0.18, legs.trunkWidth)
+        var out: [(z: Float, r: Float)] = []
+        if legs.trunkHalf > w * 0.9 {
+            let span = legs.trunkHalf * 2 - w * 2
+            let n = max(2, Int(ceilf(span / (w * 1.1))) + 1)
+            for k in 0..<n {
+                let z = legs.trunkZ - legs.trunkHalf + w + span * Float(k) / Float(n - 1)
+                out.append((z, w))
+            }
+        } else {
+            out.append((legs.trunkZ, max(w, min(legs.radius, 0.45))))
+        }
+        // a head (or upright torso) poking out past the front of the trunk
+        // where the snout ends: neck socket plus the head's mouth point, tipped by the neck angle
+        let nr = torso.neckRot - tiltFor(combo)
+        let mz = head.mouth.z * cosf(nr) + head.mouth.y * sinf(nr)
+        let hp = V3(0, 0, legs.attach.z + torso.neck.z + mz)
+        let front = (out.last?.z ?? 0) + (out.last?.r ?? 0)
+        if hp.z > front + 0.05 {
+            let hr = clampf(head.height * 0.35, 0.1, 0.32)
+            out.append((hp.z - hr * 0.6, hr))
+        }
+        return out
+    }
     var mass: Float { legs.mass + torso.mass + (head.species == .cow ? 1 : head.species == .chicken ? 0.2 : head.species == .human ? 0.6 : max(0.1, head.species.def.size * head.species.def.size * 0.6)) }
 
     /// World-ish point (body space) where the mouth is, for effects.

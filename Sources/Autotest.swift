@@ -116,6 +116,26 @@ extension Game {
         check(abs(p.z - Farm.barn.z) > 5 || abs(p.x - Farm.barn.x) > 8, "barn walls push you out")
         check(world.ladder(near: V3(Farm.silo.x + Farm.silo.r + 0.5, 0, Farm.silo.z), r: 0.3) != nil, "silo ladder reachable")
 
+        // hitboxes: a cow is a chain of circles; its nose can't go through the barn wall,
+        // and a human can walk right up to the wall (no invisible padding) and under the eaves
+        do {
+            body.setCombo(Combo(.cow, .cow, .cow))
+            let hc = body.hitCircles()
+            check(hc.count >= 3, "cow hitbox is a chain of \(hc.count) circles (\(hc.map { String(format: "%.2f", $0.z) }.joined(separator: ",")))")
+            let wallZ = Farm.barn.z - Farm.barn.wid / 2      // north wall (clear of the hay stairs)
+            pos = V3(Farm.barn.x, 0, wallZ - 4); yaw = 0; hitCache = body.hitCircles()
+            for _ in 0..<160 { pos.z += 0.05; hitCache = body.hitCircles(); collideBody(step: 0.35) }
+            let nose = pos.z + frontReach
+            check(nose <= wallZ - 0.1 && nose > wallZ - 0.6, String(format: "cow nose stops right at the barn wall (nose %.2f, wall %.2f)", nose, wallZ - 0.12))
+            body.setCombo(Combo(.human, .human, .human))
+            pos = V3(Farm.barn.x, 0, wallZ - 4); yaw = 0
+            for _ in 0..<160 { pos.z += 0.05; hitCache = body.hitCircles(); collideBody(step: 0.45) }
+            check(wallZ - pos.z < 0.6, String(format: "human walks right up to the wall (%.2f m from it)", wallZ - pos.z))
+            let under = world.ground(Farm.barn.x, wallZ + 0.4, y: 0, r: 0.3).0
+            check(under < 0.5, String(format: "ground under the eaves is the yard (%.2f)", under))
+            let onRoof = world.ground(Farm.barn.x, wallZ + 0.4, y: 7, r: 0.3).0
+            check(onRoof > 6, String(format: "eaves are standable from above (%.2f)", onRoof))
+        }
         // simulated play: walk the player around and let the animals live for 20 s
         enter(.play)
         pos = V3(2, 0, 7)

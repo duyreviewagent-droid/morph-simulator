@@ -14,7 +14,7 @@ if let dir = argValue("--make-icon") {
 }
 
 // Windowless modes: these work even while the Mac is locked (a GUI launch waits for the login window).
-if argv.contains("--autotest") || argValue("--offshot") != nil {
+if argv.contains("--autotest") || argValue("--offshot") != nil || argValue("--trailer") != nil {
     SaveData.disabled = true
     let w = CGFloat(Double(argValue("--width") ?? "") ?? 1280), h = CGFloat(Double(argValue("--height") ?? "") ?? 800)
     let view = GameView(frame: NSRect(x: 0, y: 0, width: w, height: h))
@@ -23,6 +23,15 @@ if argv.contains("--autotest") || argValue("--offshot") != nil {
     game.ignoreInput = true
     if argv.contains("--autotest") { exit(game.autotest() ? 0 : 1) }
     view.delegate = nil
+    if let dir = argValue("--trailer") {
+        let r = SCNRenderer(device: MTLCreateSystemDefaultDevice(), options: nil)
+        r.scene = game.scene
+        r.pointOfView = game.camNode
+        r.overlaySKScene = game.hud.scene
+        game.hud.layout(CGSize(width: w, height: h))
+        game.renderTrailer(to: dir, renderer: r, size: CGSize(width: w, height: h))
+        exit(0)
+    }
     if let m = argValue("--map"), let i = Int(m) { game.loadMap(i) }
     if let s = argValue("--combo") { game.devCombo(s) }
     if let s = argValue("--scene") { game.devScene(s) }

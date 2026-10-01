@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1b1712">
+<title>Morph Simulator</title>
+<meta name="description" content="Be a human, a chicken and a cow at the same time. Mix the head, body and legs of 100 animals across 10 maps.">
+<link rel="icon" href="img/icon.png">
+<style>
+  :root { --y: #ffc95a; --o: #ff9d45; --ink: #22180e; --card: rgba(16, 13, 10, .72); --line: rgba(255,255,255,.16); --txt: #fff7e8; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #111; color: var(--txt); font-family: "Avenir Next", "Nunito", system-ui, sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+  canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .hidden { display: none !important; }
+  button { font: inherit; cursor: pointer; border: 0; color: inherit; }
+  .btn { background: var(--y); color: var(--ink); font-weight: 900; letter-spacing: .03em; padding: 14px 28px; border-radius: 16px; font-size: 20px; box-shadow: 0 5px 0 #b88a2a, 0 10px 24px rgba(0,0,0,.35); }
+  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #b88a2a; }
+  .btn.big { font-size: 32px; padding: 18px 64px; border-radius: 22px; }
+  .btn.ghost { background: rgba(255,255,255,.12); color: var(--txt); box-shadow: none; border: 1px solid var(--line); }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .shade { text-shadow: 0 2px 4px rgba(0,0,0,.6); }
+
+  /* title */
+  #title { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 35%, rgba(0,0,0,.5)); text-align: center; padding: 16px; }
+  #logo { font-weight: 900; line-height: .9; filter: drop-shadow(0 6px 0 rgba(0,0,0,.35)); }
+  #logo .a { font-size: min(16vw, 120px); color: #fff0cf; }
+  #logo .b { font-size: min(10vw, 74px); color: var(--o); display: block; }
+  #tagline { font-size: min(4.4vw, 22px); font-weight: 700; max-width: 760px; }
+  #mapPick { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+  #mapPick button { background: rgba(255,255,255,.14); width: 52px; height: 52px; border-radius: 14px; font-size: 26px; font-weight: 900; }
+  #mapName { font-size: min(6vw, 30px); font-weight: 900; color: #b8ffc6; min-width: 240px; }
+  #mapBlurb { font-size: 15px; opacity: .9; min-height: 20px; }
+  #macRow { margin-top: 8px; font-size: 15px; }
+  #macRow a { color: var(--y); font-weight: 800; }
+  #titleKeys { position: fixed; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 13px; opacity: .85; }
+
+  /* play HUD */
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  #hud .pe { pointer-events: auto; }
+  #combo { position: absolute; left: max(12px, env(safe-area-inset-left)); top: max(12px, env(safe-area-inset-top)); padding: 12px 14px; min-width: 300px; }
+  #comboName { font-size: 26px; font-weight: 900; color: #ffe9bf; margin-bottom: 6px; }
+  .slot { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 16px; font-weight: 700; }
+  .slot .k { background: var(--y); color: var(--ink); border-radius: 7px; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14px; flex: none; }
+  .slot .lab { width: 46px; opacity: .8; font-size: 13px; letter-spacing: .05em; }
+  .slot .sp { min-width: 110px; font-weight: 900; }
+  .slot button.add { background: rgba(140,210,255,.18); border: 1px solid rgba(140,210,255,.4); color: #cdeeff; border-radius: 9px; padding: 3px 9px; font-size: 13px; font-weight: 800; white-space: nowrap; }
+  .slot button.sw { background: rgba(255,255,255,.12); border-radius: 8px; width: 30px; height: 26px; font-weight: 900; }
+  #topRight { position: absolute; right: max(12px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top)); display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  #topRight button { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 9px 14px; font-weight: 900; font-size: 15px; }
+  #abilities { position: absolute; left: max(12px, env(safe-area-inset-left)); bottom: 12px; padding: 10px 14px; font-size: 14px; font-weight: 700; line-height: 1.65; }
+  #abilities b { color: var(--y); display: inline-block; min-width: 54px; }
+  #hint { position: absolute; left: 0; right: 0; bottom: 110px; text-align: center; font-size: 19px; font-weight: 800; }
+  #toast { position: absolute; left: 50%; top: 90px; transform: translateX(-50%); padding: 14px 28px; text-align: center; transition: opacity .3s; opacity: 0; }
+  #toast .t1 { font-size: 26px; font-weight: 900; color: #b8ffc6; } #toast .t2 { font-size: 15px; opacity: .9; }
+  #saved { position: absolute; right: 18px; bottom: 14px; font-weight: 900; color: #9dffa3; opacity: 0; transition: opacity .4s; }
+  .bubble { position: absolute; transform: translate(-50%, -100%); background: #fff; color: #1d150d; font-weight: 800; padding: 7px 14px; border-radius: 14px; font-size: 16px; white-space: nowrap; box-shadow: 0 3px 10px rgba(0,0,0,.3); }
+  .bubble.me { background: #fff6dd; }
+  .bubble::after { content: ''; position: absolute; left: 50%; bottom: -9px; margin-left: -8px; border: 8px solid transparent; border-top-color: inherit; border-top-color: #fff; border-bottom: 0; }
+
+  /* touch controls */
+  #touch { position: fixed; inset: 0; pointer-events: none; }
+  #stick { position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: 28px; width: 150px; height: 150px; border-radius: 50%; background: rgba(255,255,255,.1); border: 2px solid rgba(255,255,255,.25); pointer-events: auto; }
+  #knob { position: absolute; left: 45px; top: 45px; width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,.55); }
+  #actions { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: 22px; display: grid; grid-template-columns: repeat(3, 74px); grid-template-rows: repeat(3, 74px); gap: 10px; pointer-events: none; }
+  #actions button { pointer-events: auto; border-radius: 50%; background: rgba(20,16,12,.55); border: 2px solid rgba(255,255,255,.3); font-weight: 900; font-size: 12px; line-height: 1.1; padding: 4px; }
+  #actions button.on { background: rgba(255,201,90,.6); color: var(--ink); }
+  #actions #bJump { grid-column: 3; grid-row: 2 / span 2; border-radius: 40px; background: rgba(255,201,90,.45); font-size: 18px; }
+  body.touch #abilities { display: none; }
+  body.touch #hint { bottom: 200px; }
+
+  /* overlays */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; flex-direction: column; align-items: center; padding: max(16px, env(safe-area-inset-top)) 16px 16px; overflow: auto; }
+  .overlay h2 { font-size: 36px; font-weight: 900; margin: 6px 0 10px; color: #ffe9bf; }
+  .overlay .close { position: absolute; right: 16px; top: max(14px, env(safe-area-inset-top)); }
+  #morphTop { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: stretch; margin-bottom: 10px; }
+  .slotTab { padding: 8px 14px; border-radius: 14px; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.18); text-align: left; min-width: 170px; }
+  .slotTab.on { background: var(--y); color: var(--ink); border-color: #fff; }
+  .slotTab .l1 { font-size: 12px; font-weight: 900; opacity: .75; letter-spacing: .06em; }
+  .slotTab .l2 { font-size: 20px; font-weight: 900; }
+  .slotTab .l3 { font-size: 12px; font-weight: 800; margin-top: 3px; padding: 3px 8px; border-radius: 8px; background: rgba(120,200,255,.25); display: inline-block; }
+  #search { font: inherit; font-size: 18px; font-weight: 800; padding: 10px 14px; border-radius: 12px; border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.1); color: #fff; width: 230px; user-select: text; -webkit-user-select: text; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; width: min(1180px, 100%); }
+  #grid button { text-align: left; padding: 8px 9px; border-radius: 10px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 7px; }
+  #grid button .dot { width: 11px; height: 11px; border-radius: 50%; flex: none; border: 1px solid rgba(255,255,255,.5); }
+  #grid button.sel { background: var(--y); color: var(--ink); }
+  #grid button.hit { outline: 3px solid #fff; }
+  #morphBtns { display: flex; gap: 10px; margin: 10px 0; flex-wrap: wrap; justify-content: center; }
+  #maps { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; width: min(1180px, 100%); }
+  #maps button { text-align: left; padding: 14px; border-radius: 16px; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.15); }
+  #maps button.here { border-color: #b8ffc6; }
+  #maps .mn { font-size: 21px; font-weight: 900; } #maps .mb { font-size: 13px; opacity: .85; margin: 4px 0; } #maps .ma { font-size: 12px; color: #bfe6ff; }
+  #stats { width: min(760px, 100%); border-collapse: collapse; }
+  #stats td { padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 17px; }
+  #stats td:last-child { text-align: right; font-weight: 900; color: var(--y); }
+  #loading { position: fixed; inset: 0; background: #14110d; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 50; }
+  #loading .bar { width: min(320px, 70vw); height: 10px; border-radius: 6px; background: rgba(255,255,255,.12); overflow: hidden; }
+  #loading .bar i { display: block; height: 100%; width: 0; background: var(--y); transition: width .2s; }
+  #loading .msg { font-weight: 800; opacity: .85; }
+  #pause .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="loading"><div style="font-size:42px;font-weight:900;color:#ffe9bf">MORPH SIMULATOR</div><div class="bar"><i id="loadBar"></i></div><div class="msg" id="loadMsg">Loading…</div></div>
+
+<div id="title" class="hidden">
+  <div id="logo" class="shade"><span class="a">MORPH</span><span class="b">SIMULATOR</span></div>
+  <div id="tagline" class="shade">Be a human, a chicken and a cow at the same time. Or any of 100 animals.</div>
+  <div id="mapPick"><button id="mapPrev" aria-label="Previous map">◀</button><div><div id="mapName" class="shade">FARM</div><div id="mapBlurb" class="shade"></div></div><button id="mapNext" aria-label="Next map">▶</button></div>
+  <button id="play" class="btn big">PLAY</button>
+  <div id="macRow" class="shade hidden">On a Mac? <a href="mac.html">Download the Mac app and watch the trailer</a></div>
+  <div id="titleKeys" class="shade"></div>
+</div>
+
+<div id="hud" class="hidden">
+  <div id="combo" class="panel pe">
+    <div id="comboName">HUMAN</div>
+    <div class="slot" data-slot="0"><span class="k">1</span><span class="lab">HEAD</span><button class="sw pe" data-dir="-1">‹</button><span class="sp">Human</span><button class="sw pe" data-dir="1">›</button><button class="add pe" data-add="0">4 · add-on</button></div>
+    <div class="slot" data-slot="1"><span class="k">2</span><span class="lab">BODY</span><button class="sw pe" data-dir="-1">‹</button><span class="sp">Human</span><button class="sw pe" data-dir="1">›</button><button class="add pe" data-add="1">5 · add-on</button></div>
+    <div class="slot" data-slot="2"><span class="k">3</span><span class="lab">LEGS</span><button class="sw pe" data-dir="-1">‹</button><span class="sp">Human</span><button class="sw pe" data-dir="1">›</button><button class="add pe" data-add="2">6 · add-on</button></div>
+  </div>
+  <div id="topRight" class="pe">
+    <button id="bMorph">🧬 Morph</button><button id="bRandom">🎲</button><button id="bMaps">🗺 Maps</button><button id="bStats">📊 Stats</button><button id="bPause">⏸</button>
+  </div>
+  <div id="abilities" class="panel"></div>
+  <div id="hint" class="shade"></div>
+  <div id="toast" class="panel"><div class="t1"></div><div class="t2"></div></div>
+  <div id="saved">SAVED</div>
+  <div id="bubbles"></div>
+</div>
+
+<div id="touch" class="hidden">
+  <div id="stick"><div id="knob"></div></div>
+  <div id="actions">
+    <button id="bE">E</button><button id="bF">F</button><button id="bRun">RUN</button>
+    <button id="bR">R</button><button id="bQ">Q</button><button id="bJump">JUMP</button>
+    <span></span><span></span>
+  </div>
+</div>
+
+<div id="morph" class="overlay hidden">
+  <button class="btn ghost close" data-close>✕ Close</button>
+  <h2 id="morphTitle">MORPH</h2>
+  <div id="morphTop">
+    <button class="slotTab" data-tab="0"><div class="l1">1 · HEAD</div><div class="l2">Human</div><div class="l3" data-add="0">4 · add-on: None</div></button>
+    <button class="slotTab" data-tab="1"><div class="l1">2 · BODY</div><div class="l2">Human</div><div class="l3" data-add="1">5 · add-on: None</div></button>
+    <button class="slotTab" data-tab="2"><div class="l1">3 · LEGS</div><div class="l2">Human</div><div class="l3" data-add="2">6 · add-on: None</div></button>
+    <input id="search" placeholder="Type an animal…" autocomplete="off" autocapitalize="off" spellcheck="false">
+  </div>
+  <div id="morphBtns"><button class="btn ghost" id="wholeBtn">Whole animal</button><button class="btn ghost" id="randBtn">🎲 Random</button></div>
+  <div id="grid"></div>
+</div>
+
+<div id="mapsOv" class="overlay hidden">
+  <button class="btn ghost close" data-close>✕ Close</button>
+  <h2>MAPS</h2>
+  <div id="maps"></div>
+</div>
+
+<div id="statsOv" class="overlay hidden">
+  <button class="btn ghost close" data-close>✕ Close</button>
+  <h2>STATS</h2>
+  <table id="stats"></table>
+</div>
+
+<div id="pause" class="overlay hidden" style="justify-content:center">
+  <h2>PAUSED</h2>
+  <div class="row"><button class="btn" id="resume">Resume</button><button class="btn ghost" id="musicBtn">Music: on</button><button class="btn ghost" id="toTitle">Title</button></div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

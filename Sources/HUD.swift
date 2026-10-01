@@ -47,6 +47,8 @@ final class HUD {
     private var mapCards: [(SKShapeNode, SKLabelNode, SKLabelNode, SKLabelNode)] = []
     private(set) var mapRects: [CGRect] = []
     private let loadingBg = SKShapeNode(), loadingLbl = SKLabelNode()
+    let trailerLayer = SKNode()
+    private let capBig = SKLabelNode(), capSmall = SKLabelNode()
     private let dimM = SKShapeNode(), dimC = SKShapeNode(), dimMaps = SKShapeNode()
     private(set) var playRect = CGRect.zero
 
@@ -195,6 +197,23 @@ final class HUD {
     }
 
     func loading(_ on: Bool) { loadingBg.isHidden = !on }
+    func playLayerHidden(_ h: Bool) { playLayer.alpha = h ? 0 : 1; bubbleLayer.alpha = h ? 0 : 1 }
+
+    /// Trailer captions: a big line and a small line, faded by `alpha`.
+    func caption(_ big: String, _ small: String, alpha: CGFloat, title: Bool) {
+        if trailerLayer.parent == nil {
+            scene.addChild(trailerLayer)
+            style(capBig, 64, heavy, color: color(1, 0.92, 0.72), parent: trailerLayer)
+            style(capSmall, 30, demi, color: .white, parent: trailerLayer)
+        }
+        setText(capBig, big); setText(capSmall, small)
+        capBig.fontSize = title ? 110 : 60
+        for c in capBig.children { (c as? SKLabelNode)?.fontSize = capBig.fontSize }
+        capBig.fontColor = title ? color(1, 0.75, 0.35) : color(1, 0.92, 0.72)
+        capBig.position = CGPoint(x: size.width / 2, y: title ? size.height * 0.58 : size.height * 0.2)
+        capSmall.position = CGPoint(x: size.width / 2, y: title ? size.height * 0.58 - 80 : size.height * 0.2 - 52)
+        trailerLayer.alpha = alpha
+    }
 
     func showMaps(current: Int, visited: Set<Int>) {
         for (i, c) in mapCards.enumerated() {

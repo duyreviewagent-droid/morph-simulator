@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Morph Simulator</title>
+<title>Morph Simulator for Mac</title>
 <meta name="description" content="Be a human, a chicken and a cow at the same time. Mix the head, body and legs of 100 animals. A free game for Mac.">
 <meta property="og:title" content="Morph Simulator">
 <meta property="og:description" content="Mix the head, body and legs of 100 animals across 10 maps. Free for Mac.">
@@ -23,8 +23,8 @@
   body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.55 Nunito, system-ui, sans-serif; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
   header { position: relative; overflow: hidden; }
-  header img.hero { width: 100%; display: block; max-height: 560px; object-fit: cover; }
-  .hero-text { position: absolute; inset: auto 0 0 0; padding: 48px 16px 28px; background: linear-gradient(transparent, rgba(0,0,0,.72)); color: #fff; text-align: center; }
+  header .hero { width: 100%; display: block; max-height: 620px; background: #000; }
+  .hero-text { padding: 28px 16px 8px; color: var(--ink); text-align: center; } .hero-text h1 { color: var(--accent); text-shadow: none; } .hero-text .small { color: var(--muted); }
   h1 { font: 700 clamp(40px, 8vw, 84px)/1 Fredoka, sans-serif; margin: 0; letter-spacing: .5px; color: #fff3d6; text-shadow: 0 3px 0 rgba(0,0,0,.35); }
   h1 span { color: var(--accent2); }
   .tag { font-size: clamp(16px, 2.6vw, 22px); margin: 8px 0 18px; }
@@ -49,12 +49,16 @@
 </head>
 <body>
 <header>
-  <img class="hero" src="img/title.jpg" alt="Morph Simulator title screen on the Savanna map">
+  <video class="hero" src="trailer.mp4" poster="img/trailer-poster.jpg" controls playsinline preload="metadata"></video>
   <div class="hero-text">
     <h1>MORPH <span>SIMULATOR</span></h1>
     <div class="tag">Be a human, a chicken and a cow at the same time. Or any of 100 animals.</div>
-    <a class="btn" href="MorphSimulator.zip" download>Download for Mac</a>
-    <div class="small">Free · 1 MB · macOS 13 or newer</div>
+    <div id="macOnly">
+      <a class="btn" href="MorphSimulator.zip" download>Download for Mac</a>
+      <div class="small">Free · 1 MB · macOS 13 or newer</div>
+    </div>
+    <div id="notMac" class="small" style="display:none">The download is for Mac computers. On this device you can <a href="./">play right here in your browser</a>.</div>
+    <div class="small" style="margin-top:12px"><a href="./">Or play it in your browser →</a></div>
   </div>
 </header>
 
@@ -82,13 +86,22 @@
     <tr><td><kbd>B</kbd> · <kbd>J</kbd> · <kbd>ESC</kbd></td><td>Maps · Stats · Pause</td></tr>
   </table>
 
-  <h2>Opening it the first time</h2>
-  <div class="note">
+  <h2 class="maconly">Opening it the first time</h2>
+  <div class="note maconly">
     Unzip it, then <b>right-click "Morph Simulator" and choose Open</b>, then Open again.
     macOS asks this once because the game isn't from the App Store.
   </div>
 </main>
 
-<footer>Morph Simulator · made for Mac</footer>
+<footer>Morph Simulator · <a href="./">play in your browser</a></footer>
+<script>
+  // the download only makes sense on a Mac computer (iPads report themselves as Macs, so check for touch)
+  const mac = /Macintosh/.test(navigator.userAgent) && !((navigator.maxTouchPoints || 0) > 1)
+  if (!mac) {
+    document.getElementById('macOnly').style.display = 'none'
+    document.getElementById('notMac').style.display = 'block'
+    document.querySelectorAll('.maconly').forEach(e => e.style.display = 'none')
+  }
+</script>
 </body>
 </html>

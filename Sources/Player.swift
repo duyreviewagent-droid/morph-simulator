@@ -6,8 +6,39 @@ let gravity: Float = 14
 extension Game {
     var forward: V3 { V3(sinf(yaw), 0, cosf(yaw)) }
 
+    /// Collision circles in world space (centre at ground level, radius).
+    func bodyCircles() -> [(c: V3, r: Float)] {
+        let fw = forward
+        return hitCache.map { (pos + fw * $0.z, $0.r) }
+    }
+    var frontReach: Float { hitCache.map { $0.z + $0.r }.max() ?? body.radius }
+    var backReach: Float { hitCache.map { -$0.z + $0.r }.max() ?? body.radius }
+    /// The closest point of the body to p (horizontal), and the circle radius there.
+    func nearestCircle(to p: V3) -> (c: V3, r: Float) {
+        var best = (c: pos, r: body.radius), bd: Float = 1e9
+        for (c, r) in bodyCircles() {
+            let d = simd_length(SIMD2(p.x - c.x, p.z - c.z)) - r
+            if d < bd { bd = d; best = (c, r) }
+        }
+        return best
+    }
+    /// Pushes every circle of the body out of the world, a couple of passes.
+    func collideBody(step: Float) {
+        for _ in 0..<2 {
+            var moved = false
+            for (c, r) in bodyCircles() {
+                var p = V3(c.x, pos.y, c.z)
+                if world.collide(&p, r: r, h: body.height * 0.8, step: step) {
+                    pos.x += p.x - c.x; pos.z += p.z - c.z
+                    moved = true
+                }
+            }
+            if !moved { break }
+        }
+    }
+
     func nearestProp(_ reach: Float) -> Prop? {
-        let hand = pos + forward * (body.radius + 0.35)
+        let hand = pos + forward * (frontReach * 0.8 + 0.35)
         var best: Prop?, bd: Float = 99
         for p in props where !p.held && !p.dead {
             let d = simd_length(SIMD2(p.pos.x - hand.x, p.pos.z - hand.z))
@@ -182,7 +213,8 @@ extension Game {
 
             let prevY = pos.y
             pos += vel * dt
-            _ = world.collide(&pos, r: body.radius, h: body.height * 0.8, step: ls.step)
+            hitCache = body.hitCircles()
+            collideBody(step: ls.step)
             let wasSwimming = swimming
             var (g, surf, tag) = world.ground(pos.x, pos.z, y: prevY, r: body.radius, step: ls.step)
             // deep water: float at the surface and swim
@@ -252,7 +284,7 @@ extension Game {
                 p.vel = forward * (pumpkin ? 8.5 : 12) + V3(0, pumpkin ? 5 : 4, 0) + V3(vel.x, 0, vel.z) * 0.5
                 p.thrownFrom = pos
                 p.thrownBy = true
-                p.pos = pos + V3(0, body.legs.attach.y + 0.5, 0) + forward * (body.radius + 0.2)
+                p.pos = pos + V3(0, body.legs.attach.y + 0.5, 0) + forward * (frontReach + 0.2)
                 carrying = nil
                 audio.play("throw", volume: 0.6)
                 if p.kind == .egg { complete("eggtoss") }
@@ -264,7 +296,7 @@ extension Game {
             let before = layT
             layT += dt
             if before < 0.55 && layT >= 0.55 {
-                let back = pos - forward * (body.radius + 0.1) + V3(0, max(0.12, body.legs.attach.y * 0.45), 0)
+                let back = pos - forward * (backReach + 0.1) + V3(0, max(0.12, body.legs.attach.y * 0.45), 0)
                 let egg = Prop(.egg, at: back)
                 egg.vel = -forward * 0.6
                 egg.laid = true
@@ -390,7 +422,7 @@ extension Game {
     func inFront(_ p: V3, range: Float, cone: Float = 0.3, behind: Bool = false) -> Bool {
         let d = SIMD2(p.x - pos.x, p.z - pos.z)
         let l = simd_length(d)
-        guard l < range + body.radius, l > 0.01, abs(p.y - pos.y) < 2.5 else { return false }
+        guard l < range + (behind ? backReach : frontReach), l > 0.01, abs(p.y - pos.y) < 2.5 else { return false }
         let fw = SIMD2(sinf(yaw), cosf(yaw)) * (behind ? -1 : 1)
         return simd_dot(d / l, fw) > cone
     }
@@ -457,17 +489,19 @@ extension Game {
     }
 
     func interactions(_ dt: Float) {
+        hitCache = body.hitCircles()
         let r = body.radius
         let hv = SIMD2(vel.x, vel.z)
         let hs = simd_length(hv)
         // walk into loose props to push and kick them
         for p in props where !p.held && !p.dead {
-            let d = SIMD2(p.pos.x - pos.x, p.pos.z - pos.z)
+            let (cc, cr) = nearestCircle(to: p.pos)
+            let d = SIMD2(p.pos.x - cc.x, p.pos.z - cc.z)
             let l = simd_length(d)
-            let minD = r + p.radius
+            let minD = cr + p.radius
             guard l < minD, l > 0.001, p.pos.y < pos.y + body.height * 0.6 else { continue }
             let n = d / l
-            p.pos.x = pos.x + n.x * minD; p.pos.z = pos.z + n.y * minD
+            p.pos.x = cc.x + n.x * minD; p.pos.z = cc.z + n.y * minD
             let into = simd_dot(hv, n)
             if into > 0 {
                 let kick: Float = p.kind == .ball ? 1.8 : p.kind == .pumpkin ? 0.9 : 1.2
@@ -483,10 +517,16 @@ extension Game {
         }
         // bump into animals and the farmer
         for n in npcs {
-            let d = SIMD2(n.pos.x - pos.x, n.pos.z - pos.z)
+            // closest pair of circles between the two bodies
+            var best: Float = 1e9, d = SIMD2<Float>(1, 0), minD: Float = 0
+            for (nc, nr) in n.worldCircles() {
+                let (cc, cr) = nearestCircle(to: nc)
+                let dd = SIMD2(nc.x - cc.x, nc.z - cc.z)
+                let gap = simd_length(dd) - cr - nr
+                if gap < best { best = gap; d = dd; minD = cr + nr }
+            }
             let l = simd_length(d)
-            let minD = r + n.radius
-            guard l < minD, l > 0.001, abs(n.pos.y + n.y - pos.y) < 1.5 else { continue }
+            guard best < 0, l > 0.001, abs(n.pos.y + n.y - pos.y) < 1.5 else { continue }
             let nn = d / l
             let push = minD - l
             let heavy = body.mass
@@ -502,7 +542,7 @@ extension Game {
         // pouncing onto someone
         if pounceT > 0 {
             pounceT -= dt
-            for n in npcs where simd_length(n.pos - pos) < r + n.radius + 0.6 {
+            for n in npcs where simd_length(n.pos - nearestCircle(to: n.pos).c) < nearestCircle(to: n.pos).r + n.radius + 0.6 {
                 if n.kind == .farmer { n.knock(SIMD2(sinf(yaw), cosf(yaw)), 3); complete("tackle") } else { n.flee(from: pos) }
                 pounceT = 0
                 audio.play("shove", volume: 0.7)

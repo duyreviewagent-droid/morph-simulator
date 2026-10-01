@@ -44,6 +44,7 @@ final class NPC {
     weak var host: NPCHost?
     private var rng: RNG
     var species: Species = .human
+    var circleCache: [(z: Float, r: Float)] = []
     var home = V3.zero
     var aquatic = false
     private var talkT: Float = 0, waveT: Float = 0
@@ -90,6 +91,12 @@ final class NPC {
     }
 
     var radius: Float { body.radius * scale }
+    /// Collision circles in world space (long animals get several).
+    func worldCircles() -> [(c: V3, r: Float)] {
+        let fw = V3(sinf(yaw), 0, cosf(yaw))
+        if circleCache.isEmpty { circleCache = body.hitCircles() }
+        return circleCache.map { (pos + fw * ($0.z * scale), $0.r * scale) }
+    }
     var isChicken: Bool { kind == .hen || kind == .rooster }
 
     private func bounds() -> (Float, Float, Float, Float) {

@@ -1,9 +1,15 @@
+# Morph Simulator on Render: a free static site. The browser game is web/public (index.html);
+# web/public/mac.html is the Mac download page with the trailer.
 services:
   - type: web
     name: morph-simulator
     runtime: static
-    staticPublishPath: ./site
+    buildCommand: echo "nothing to build"
+    staticPublishPath: ./web/public
     headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
       - path: /MorphSimulator.zip
         name: Content-Disposition
         value: attachment; filename="MorphSimulator.zip"
