@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: morph-simulator
+    runtime: static
+    staticPublishPath: ./site
+    headers:
+      - path: /MorphSimulator.zip
+        name: Content-Disposition
+        value: attachment; filename="MorphSimulator.zip"
