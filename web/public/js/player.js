@@ -106,7 +106,7 @@ export const PlayerMixin = {
       mx += inp.move.x; my += inp.move.y
     }
     const F = V(Math.sin(this.camYaw), 0, Math.cos(this.camYaw))
-    const R = V(-F.z, 0, F.x).multiplyScalar(-1)   // cross(F, up)
+    const R = V(-F.z, 0, F.x)   // cross(F, up) = screen right
     const wish = F.clone().multiplyScalar(my).addScaledVector(R, mx)
     if (wish.length() > 1) wish.normalize()
     const sprint = control && (inp.down('shift') || inp.running || inp.move.length() > 0.92)
